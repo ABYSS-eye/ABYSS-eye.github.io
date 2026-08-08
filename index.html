@@ -1,108 +1,617 @@
-```html
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ABYSS-eye</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ABYSS-EYE</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            touch-action: none;
         }
         body {
             background: #0a0a0a;
-            color: #00ff88;
-            font-family: 'Courier New', monospace;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
             overflow: hidden;
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        .container {
-            text-align: center;
+        #score {
+            font-size: 20px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ff88;
+        }
+        #gameContainer {
             position: relative;
+            width: 300px;
+            height: 300px;
+            background: #050505;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
         }
-        h1 {
-            font-size: 4em;
-            text-shadow: 0 0 10px #00ff88, 0 0 40px #00ff88, 0 0 80px #00ff88;
-            animation: flicker 3s infinite alternate;
-            letter-spacing: 0.1em;
+        #gameContainer canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 300px;
+            image-rendering: pixelated;
         }
-        .subtitle {
-            font-size: 1.2em;
-            color: #00cc66;
-            margin-top: 20px;
-            opacity: 0.7;
-            animation: fadeIn 2s ease-in;
+        #coverCanvas {
+            opacity: 0;
+            pointer-events: none;
         }
-        .eye {
-            font-size: 6em;
-            margin-bottom: 20px;
-            animation: blink 4s infinite;
-            filter: drop-shadow(0 0 20px #00ff88);
+        #noiseCanvas {
+            opacity: 0;
+            pointer-events: none;
         }
-        @keyframes flicker {
-            0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
-                opacity: 1;
-                text-shadow: 0 0 10px #00ff88, 0 0 40px #00ff88, 0 0 80px #00ff88;
-            }
-            20%, 24%, 55% {
-                opacity: 0.8;
-                text-shadow: 0 0 5px #00ff88, 0 0 20px #00ff88;
-            }
+        #fxCanvas {
+            pointer-events: none;
         }
-        @keyframes blink {
-            0%, 90%, 100% { transform: scaleY(1); }
-            95% { transform: scaleY(0.1); }
+        #glitchCanvas {
+            opacity: 1;
+            pointer-events: none;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 0.7; transform: translateY(0); }
+        #startText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            text-align: center;
+            animation: blink 1.2s infinite;
+            z-index: 5;
+            pointer-events: none;
         }
-        .scanline {
-            position: fixed;
+        #winOverlay {
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(
-                to bottom,
-                transparent 50%,
-                rgba(0, 255, 136, 0.03) 50%
-            );
-            background-size: 100% 4px;
-            pointer-events: none;
+            display: none;
+            justify-content: center;
+            align-items: center;
             z-index: 10;
         }
-        .glow {
-            position: absolute;
-            width: 300px;
-            height: 300px;
-            background: radial-gradient(circle, rgba(0,255,136,0.1) 0%, transparent 70%);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            animation: pulse 3s infinite;
+        #winOverlay.show {
+            display: flex;
         }
-        @keyframes pulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
-            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+        #winBox {
+            width: 160px;
+            height: 70px;
+            background: #050505;
+            border: 2px solid #00ff88;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: translateY(-250px);
+            transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        #winOverlay.show #winBox {
+            transform: translateY(0);
+        }
+        #nextBtn {
+            color: #00ff88;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+            letter-spacing: 6px;
+            padding: 8px 24px;
+            border: 1px solid #00ff88;
+            transition: all 0.3s;
+            position: relative;
+            z-index: 2;
+        }
+        #nextBtn:hover {
+            background: #00ff88;
+            color: #000;
+        }
+        .controls {
+            margin-top: 10px;
+            font-size: 12px;
+            opacity: 0.5;
+        }
+        #dpad {
+            display: none;
+            margin-top: 15px;
+            gap: 5px;
+            flex-direction: column;
+            align-items: center;
+        }
+        .dpad-row {
+            display: flex;
+            gap: 5px;
+        }
+        .dpad-btn {
+            width: 55px;
+            height: 55px;
+            background: rgba(0, 255, 136, 0.08);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            color: #00ff88;
+            font-size: 22px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.1s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .dpad-btn:active {
+            background: rgba(0, 255, 136, 0.25);
+            transform: scale(0.92);
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+        @media (hover: none) and (pointer: coarse) {
+            .controls { display: none; }
+            #dpad { display: flex; }
         }
     </style>
 </head>
 <body>
-    <div class="scanline"></div>
-    <div class="glow"></div>
-    <div class="container">
-        <div class="eye">👁</div>
-        <h1>ABYSS-EYE</h1>
-        <p class="subtitle">abyss-eye.github.io</p>
+    <div id="score">0 / 10</div>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="300" height="300"></canvas>
+        <canvas id="coverCanvas" width="300" height="300"></canvas>
+        <canvas id="noiseCanvas" width="300" height="300"></canvas>
+        <canvas id="fxCanvas" width="300" height="300"></canvas>
+        <canvas id="glitchCanvas" width="300" height="300"></canvas>
+        <div id="startText">Press any arrow key<br>to start</div>
+        <div id="winOverlay">
+            <div id="winBox">
+                <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" id="nextBtn">NEXT?</a>
+            </div>
+        </div>
     </div>
+    <div class="controls">arrow keys to move</div>
+
+    <div id="dpad">
+        <div class="dpad-row">
+            <div class="dpad-btn" data-dir="up">&#9650;</div>
+        </div>
+        <div class="dpad-row">
+            <div class="dpad-btn" data-dir="left">&#9664;</div>
+            <div class="dpad-btn" data-dir="down">&#9660;</div>
+            <div class="dpad-btn" data-dir="right">&#9654;</div>
+        </div>
+    </div>
+
+    <script>
+        const container = document.getElementById('gameContainer');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const coverCanvas = document.getElementById('coverCanvas');
+        const noiseCanvas = document.getElementById('noiseCanvas');
+        const noiseCtx = noiseCanvas.getContext('2d');
+        const fxCanvas = document.getElementById('fxCanvas');
+        const fxCtx = fxCanvas.getContext('2d');
+        const glitchCanvas = document.getElementById('glitchCanvas');
+        const glitchCtx = glitchCanvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const startText = document.getElementById('startText');
+        const winOverlay = document.getElementById('winOverlay');
+
+        const gridSize = 15;
+        const tileCount = canvas.width / gridSize;
+
+        let snake = [{x: 10, y: 10}];
+        let food = {x: 15, y: 15};
+        let dx = 0;
+        let dy = 0;
+        let score = 0;
+        let gameRunning = false;
+        let gameWon = false;
+        let winState = null;
+        let winTimer = 0;
+        let glitchActive = false;
+        let glitchEndTimer = 0;
+        let nextGlitchTime = 999999;
+
+        function scheduleMicroFlash() {
+            const delay = 2000 + Math.random() * 3000;
+            setTimeout(() => {
+                document.body.style.background = '#0b0b0b';
+                setTimeout(() => {
+                    document.body.style.background = '#0a0a0a';
+                    scheduleMicroFlash();
+                }, 25 + Math.random() * 35);
+            }, delay);
+        }
+        scheduleMicroFlash();
+
+        function drawFx() {
+            fxCtx.clearRect(0, 0, 300, 300);
+            fxCtx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+            for (let y = 0; y < 300; y += 3) {
+                fxCtx.fillRect(0, y, 300, 1);
+            }
+            fxCtx.fillStyle = 'rgba(0, 255, 136, 0.02)';
+            for (let y = 0; y < 300; y += 3) {
+                fxCtx.fillRect(0, y + 1, 300, 1);
+            }
+            const grad = fxCtx.createRadialGradient(150, 150, 90, 150, 150, 170);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.7, 'rgba(0,0,0,0.3)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+            fxCtx.fillStyle = grad;
+            fxCtx.fillRect(0, 0, 300, 300);
+        }
+        drawFx();
+
+        function drawNoise() {
+            const w = noiseCanvas.width;
+            const h = noiseCanvas.height;
+            const imgData = noiseCtx.createImageData(w, h);
+            const data = imgData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const v = Math.random() * 255;
+                data[i] = v;
+                data[i+1] = v;
+                data[i+2] = v;
+                data[i+3] = 255;
+            }
+            noiseCtx.putImageData(imgData, 0, 0);
+        }
+
+        function drawDarkGlitch() {
+            glitchCtx.clearRect(0, 0, 300, 300);
+            
+            for (let i = 0; i < 12; i++) {
+                const y = Math.random() * 300;
+                const h = 1;
+                const offset = (Math.random() - 0.5) * 20;
+                const type = Math.random();
+                
+                if (type < 0.4) {
+                    glitchCtx.fillStyle = `rgba(180, 0, 40, ${0.3 + Math.random() * 0.5})`;
+                } else if (type < 0.7) {
+                    glitchCtx.fillStyle = `rgba(255, 255, 255, ${0.2 + Math.random() * 0.4})`;
+                } else {
+                    glitchCtx.fillStyle = `rgba(0, 0, 0, ${0.5 + Math.random() * 0.5})`;
+                }
+                glitchCtx.fillRect(offset, y, 300, h);
+                
+                glitchCtx.fillStyle = `rgba(0, 0, 0, ${0.3 + Math.random() * 0.3})`;
+                glitchCtx.fillRect(offset + (Math.random()-0.5)*6, y+1, 300, 1);
+            }
+            
+            for (let i = 0; i < 3; i++) {
+                const x = Math.random() * 300;
+                const w = 1 + Math.random() * 2;
+                const h = 40 + Math.random() * 100;
+                const y = Math.random() * (300 - h);
+                glitchCtx.fillStyle = `rgba(20, 20, 20, ${0.6 + Math.random() * 0.4})`;
+                glitchCtx.fillRect(x, y, w, h);
+            }
+            
+            const shakeX = (Math.random() - 0.5) * 6;
+            const shakeY = (Math.random() - 0.5) * 4;
+            container.style.transform = `translate(${shakeX}px, ${shakeY}px)`;
+        }
+
+        function drawAmbientGlitch() {
+            glitchCtx.clearRect(0, 0, 300, 300);
+            
+            const count = 2 + Math.floor(Math.random() * 4);
+            for (let i = 0; i < count; i++) {
+                const type = Math.random();
+                if (type < 0.5) {
+                    const y = Math.random() * 300;
+                    const h = 1 + Math.random() * 3;
+                    const offset = (Math.random() - 0.5) * 10;
+                    const alpha = 0.1 + Math.random() * 0.25;
+                    glitchCtx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
+                    glitchCtx.fillRect(offset, y, 300, h);
+                } else if (type < 0.75) {
+                    const bx = Math.random() * 260;
+                    const by = Math.random() * 260;
+                    const bw = 10 + Math.random() * 40;
+                    const bh = 4 + Math.random() * 16;
+                    const shiftX = (Math.random() - 0.5) * 8;
+                    glitchCtx.fillStyle = `rgba(0, 255, 136, ${0.06 + Math.random() * 0.12})`;
+                    glitchCtx.fillRect(bx + shiftX, by, bw, bh);
+                } else {
+                    const y = Math.random() * 300;
+                    const h = 1 + Math.random() * 2;
+                    glitchCtx.fillStyle = `rgba(100, 255, 180, ${0.1 + Math.random() * 0.2})`;
+                    glitchCtx.fillRect(0, y, 300, h);
+                }
+            }
+            
+            const shakeX = (Math.random() - 0.5) * 2;
+            const shakeY = (Math.random() - 0.5) * 1.5;
+            container.style.transform = `translate(${shakeX}px, ${shakeY}px)`;
+        }
+
+        function clearGlitch() {
+            glitchCtx.clearRect(0, 0, 300, 300);
+            container.style.transform = 'translate(0,0)';
+        }
+
+        function drawGame() {
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(0, 255, 136, 0.04)';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i < tileCount; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * gridSize, 0);
+                ctx.lineTo(i * gridSize, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i * gridSize);
+                ctx.lineTo(canvas.width, i * gridSize);
+                ctx.stroke();
+            }
+
+            snake.forEach((segment, index) => {
+                if (index === 0) {
+                    ctx.fillStyle = '#00ff88';
+                    ctx.shadowColor = '#00ff88';
+                    ctx.shadowBlur = 12;
+                } else {
+                    const alpha = 1 - (index / snake.length) * 0.6;
+                    ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
+                    ctx.shadowBlur = 0;
+                }
+                ctx.fillRect(segment.x * gridSize + 1, segment.y * gridSize + 1, gridSize - 2, gridSize - 2);
+            });
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = '#ff3366';
+            ctx.shadowColor = '#ff3366';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.arc(
+                food.x * gridSize + gridSize / 2,
+                food.y * gridSize + gridSize / 2,
+                gridSize / 2 - 2,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            const frameAlpha = 0.75 + Math.sin(Date.now() / 400) * 0.25;
+            ctx.strokeStyle = `rgba(0, 255, 136, ${frameAlpha})`;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+        }
+
+        function updateGame() {
+            if (!gameRunning || gameWon) return;
+
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                resetGame();
+                return;
+            }
+
+            for (let segment of snake) {
+                if (head.x === segment.x && head.y === segment.y) {
+                    resetGame();
+                    return;
+                }
+            }
+
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                scoreEl.textContent = `${score} / 10`;
+                
+                if (score >= 10) {
+                    triggerWin();
+                    return;
+                }
+                
+                placeFood();
+            } else {
+                snake.pop();
+            }
+        }
+
+        function placeFood() {
+            do {
+                food = {
+                    x: Math.floor(Math.random() * tileCount),
+                    y: Math.floor(Math.random() * tileCount)
+                };
+            } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
+        }
+
+        function resetGame() {
+            snake = [{x: 10, y: 10}];
+            dx = 0;
+            dy = 0;
+            score = 0;
+            scoreEl.textContent = '0 / 10';
+            gameRunning = false;
+            gameWon = false;
+            winState = null;
+            winTimer = 0;
+            glitchActive = false;
+            glitchEndTimer = 0;
+            nextGlitchTime = 999999;
+            clearGlitch();
+            coverCanvas.style.opacity = '0';
+            noiseCanvas.style.opacity = '0';
+            winOverlay.classList.remove('show');
+            startText.style.display = 'block';
+            startText.innerHTML = 'GAME OVER<br>Press arrow to restart';
+            placeFood();
+        }
+
+        function triggerWin() {
+            gameWon = true;
+            gameRunning = false;
+            winState = 'freeze';
+            winTimer = 0;
+            glitchActive = false;
+            nextGlitchTime = 0.25; // 250ms pause before dark glitch
+        }
+
+        function updateWinAnimation() {
+            if (!winState) return;
+            
+            if (winState === 'freeze') {
+                winTimer += 0.016;
+                
+                // Wait 250ms, then one dark glitch, then straight to noise
+                if (winTimer >= nextGlitchTime && !glitchActive && winTimer < 0.5) {
+                    glitchActive = true;
+                    glitchEndTimer = winTimer + 0.12; // 120ms dark glitch
+                }
+                
+                if (glitchActive && winTimer >= glitchEndTimer) {
+                    glitchActive = false;
+                    clearGlitch();
+                    winState = 'noise';
+                    winTimer = 0;
+                }
+            } else if (winState === 'noise') {
+                winTimer += 0.016;
+                const progress = Math.min(1, winTimer / 0.7);
+                coverCanvas.style.opacity = progress.toString();
+                noiseCanvas.style.opacity = progress.toString();
+                
+                if (progress >= 1) {
+                    winState = 'reveal';
+                    winTimer = 0;
+                    setTimeout(() => {
+                        winOverlay.classList.add('show');
+                        nextGlitchTime = 0.4;
+                    }, 200);
+                }
+            } else if (winState === 'reveal') {
+                winTimer += 0.016;
+                
+                if (winTimer >= nextGlitchTime) {
+                    glitchActive = true;
+                    glitchEndTimer = winTimer + 0.05 + Math.random() * 0.08;
+                    nextGlitchTime = winTimer + 1.0 + Math.random() * 1.5;
+                }
+                
+                if (winTimer >= glitchEndTimer) {
+                    glitchActive = false;
+                }
+            }
+        }
+
+        function flicker() {
+            if (Math.random() > 0.94) {
+                container.style.filter = `brightness(${0.88 + Math.random() * 0.24})`;
+            } else {
+                container.style.filter = 'brightness(1)';
+            }
+        }
+
+        function setDirection(newDx, newDy) {
+            if (gameWon) return;
+            if (!gameRunning && (newDx !== 0 || newDy !== 0)) {
+                gameRunning = true;
+                startText.style.display = 'none';
+            }
+            if (newDx !== 0 && dx === -newDx) return;
+            if (newDy !== 0 && dy === -newDy) return;
+            dx = newDx;
+            dy = newDy;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch(e.keyCode) {
+                case 37: setDirection(-1, 0); break;
+                case 38: setDirection(0, -1); break;
+                case 39: setDirection(1, 0); break;
+                case 40: setDirection(0, 1); break;
+            }
+        });
+
+        document.querySelectorAll('.dpad-btn').forEach(btn => {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const dir = btn.dataset.dir;
+                if (dir === 'up') setDirection(0, -1);
+                if (dir === 'down') setDirection(0, 1);
+                if (dir === 'left') setDirection(-1, 0);
+                if (dir === 'right') setDirection(1, 0);
+            });
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const dir = btn.dataset.dir;
+                if (dir === 'up') setDirection(0, -1);
+                if (dir === 'down') setDirection(0, 1);
+                if (dir === 'left') setDirection(-1, 0);
+                if (dir === 'right') setDirection(1, 0);
+            });
+        });
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+        
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, {passive: false});
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (gameWon) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+            const minSwipe = 30;
+            
+            if (Math.abs(diffX) < minSwipe && Math.abs(diffY) < minSwipe) return;
+            
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                if (diffX > 0) setDirection(1, 0);
+                else setDirection(-1, 0);
+            } else {
+                if (diffY > 0) setDirection(0, 1);
+                else setDirection(0, -1);
+            }
+        }, {passive: false});
+
+        placeFood();
+        
+        function gameLoop() {
+            updateGame();
+            updateWinAnimation();
+            drawGame();
+            if (glitchActive) {
+                if (winState === 'freeze') {
+                    drawDarkGlitch();
+                } else {
+                    drawAmbientGlitch();
+                }
+            } else {
+                clearGlitch();
+            }
+            flicker();
+        }
+
+        setInterval(gameLoop, 120);
+        setInterval(drawNoise, 50);
+    </script>
 </body>
 </html>
-```
